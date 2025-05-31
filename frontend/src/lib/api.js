@@ -1,4 +1,5 @@
 import { axiosInstance } from "./axios";
+import axios from "axios";
 
 // Mock data
 const mockUser = {
@@ -61,14 +62,15 @@ const mockRecommendedUsers = [
 // Simulate API delay
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Actual API calls
 export const signup = async (signupData) => {
-  await delay(500);
-  return { user: mockUser, token: 'mock-token' };
+  const response = await axios.post('/api/auth/signup', signupData);
+  return response.data;
 };
 
 export const login = async (loginData) => {
-  await delay(500);
-  return { user: mockUser, token: 'mock-token' };
+  const response = await axios.post('/api/auth/login', loginData);
+  return response.data;
 };
 
 export const logout = async () => {
