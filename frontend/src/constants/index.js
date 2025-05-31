@@ -1,23 +1,23 @@
 export const THEMES = [
   {
-    name: "light",
-    label: "Light",
-    colors: ["#ffffff", "#5a67d8", "#8b5cf6", "#1a202c"],
+    name: 'light',
+    label: 'Light',
+    colors: ['#ffffff', '#f3f4f6', '#e5e7eb'],
   },
   {
-    name: "dark",
-    label: "Dark",
-    colors: ["#1f2937", "#8b5cf6", "#ec4899", "#1a202c"],
+    name: 'dark',
+    label: 'Dark',
+    colors: ['#1f2937', '#111827', '#000000'],
+  },
+  {
+    name: 'forest',
+    label: 'Forest',
+    colors: ['#064e3b', '#065f46', '#047857'],
   },
   {
     name: "cupcake",
     label: "Cupcake",
     colors: ["#f5f5f4", "#65c3c8", "#ef9fbc", "#291334"],
-  },
-  {
-    name: "forest",
-    label: "Forest",
-    colors: ["#1f1d1d", "#3ebc96", "#70c217", "#e2e8f0"],
   },
   {
     name: "bumblebee",

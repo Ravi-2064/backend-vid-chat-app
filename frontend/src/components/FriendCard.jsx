@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link } from "react-router-dom";
 import { LANGUAGE_TO_FLAG } from "../constants";
 
 const FriendCard = ({ friend }) => {
@@ -8,7 +8,11 @@ const FriendCard = ({ friend }) => {
         {/* USER INFO */}
         <div className="flex items-center gap-3 mb-3">
           <div className="avatar size-12">
-            <img src={friend.profilePic} alt={friend.fullName} />
+            <img
+              src={friend.profilePic || "https://avatar.iran.liara.run/public/1.png"}
+              alt={friend.fullName}
+              onError={(e) => { e.target.onerror = null; /* Prevent infinite loop */ }}
+            />
           </div>
           <h3 className="font-semibold truncate">{friend.fullName}</h3>
         </div>
