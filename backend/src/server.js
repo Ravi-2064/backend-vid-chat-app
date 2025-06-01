@@ -18,7 +18,14 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: ["http://localhost:5173", "http://localhost:5174", "http://localhost:3000", "http://localhost:3001"],
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "https://vid-chat-app.vercel.app",
+      "https://vid-chat-app.web.app"
+    ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
   },
@@ -31,7 +38,9 @@ const __dirname = path.resolve();
 // CORS configuration
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://localhost:5174", "http://localhost:3000", "http://localhost:3001"],
+    origin: process.env.NODE_ENV === "production" 
+      ? ["https://vid-chat-app.vercel.app", "https://vid-chat-app.web.app"]
+      : true,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "Cookie", "X-Requested-With"],

@@ -1,23 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useSocket } from '../contexts/SocketContext';
 import { useAuth } from '../contexts/AuthContext';
-import { sendMessage as sendMessageApi } from '../lib/api';
+import { Video, Mic, Phone, MoreVertical, Users, Settings, Share2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Video, Mic, Phone, MoreVertical, Users, Settings, Copy, Share2 } from 'lucide-react';
-import ChatSidePanel from '../components/ChatSidePanel';
 
 const ChatRoom = () => {
   const { roomId } = useParams();
-  const { socket, joinRoom, leaveRoom, sendMessage } = useSocket();
+  const navigate = useNavigate();
+  const { socket, joinRoom, leaveRoom } = useSocket();
   const { user } = useAuth();
-  const [messages, setMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const messagesEndRef = useRef(null);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
-  const [showSidePanel, setShowSidePanel] = useState(true);
   const [showParticipants, setShowParticipants] = useState(true);
   const [copied, setCopied] = useState(false);
   const videoRef = useRef(null);
@@ -27,34 +21,11 @@ const ChatRoom = () => {
     if (socket) {
       joinRoom(roomId);
 
-      socket.on('receive_message', (data) => {
-        setMessages((prev) => [...prev, data]);
-      });
-
-      socket.on('user_typing', (data) => {
-        if (data.userId !== user.id) {
-          setIsTyping(true);
-        }
-      });
-
-      socket.on('user_stopped_typing', (data) => {
-        if (data.userId !== user.id) {
-          setIsTyping(false);
-        }
-      });
-
       return () => {
         leaveRoom(roomId);
-        socket.off('receive_message');
-        socket.off('user_typing');
-        socket.off('user_stopped_typing');
       };
     }
-  }, [socket, roomId, user.id, joinRoom, leaveRoom]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [socket, roomId, joinRoom, leaveRoom]);
 
   useEffect(() => {
     // Initialize video stream
@@ -70,6 +41,7 @@ const ChatRoom = () => {
         }
       } catch (error) {
         console.error('Error accessing media devices:', error);
+        toast.error('Failed to access camera/microphone');
       }
     };
 
@@ -82,28 +54,6 @@ const ChatRoom = () => {
       }
     };
   }, [isVideoEnabled, isAudioEnabled]);
-
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!newMessage.trim()) return;
-
-    try {
-      const messageData = {
-        roomId,
-        content: newMessage,
-        userId: user.id,
-        userName: user.fullName,
-        timestamp: new Date().toISOString(),
-      };
-
-      await sendMessageApi(roomId, newMessage);
-      sendMessage(messageData);
-      setMessages((prev) => [...prev, messageData]);
-      setNewMessage('');
-    } catch (err) {
-      toast.error('Failed to send message');
-    }
-  };
 
   const toggleVideo = () => {
     if (localStreamRef.current) {
@@ -126,16 +76,23 @@ const ChatRoom = () => {
   };
 
   const copyInviteLink = () => {
-    const inviteLink = `${window.location.origin}/chat/${roomId}`;
+    const inviteLink = `${window.location.origin}/video-chat/${roomId}`;
     navigator.clipboard.writeText(inviteLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleEndCall = () => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop());
+    }
+    navigate('/');
+  };
+
   return (
     <div className="flex h-screen bg-base-200">
       {/* Main Video Area */}
-      <div className={`flex-1 flex flex-col ${showSidePanel ? 'lg:w-3/4' : 'w-full'}`}>
+      <div className="flex-1 flex flex-col">
         {/* Video Container */}
         <div className="flex-1 relative bg-base-300">
           <video
@@ -165,7 +122,10 @@ const ChatRoom = () => {
               >
                 <Mic className="size-5" />
               </button>
-              <button className="btn btn-circle btn-error">
+              <button 
+                onClick={handleEndCall}
+                className="btn btn-circle btn-error"
+              >
                 <Phone className="size-5" />
               </button>
             </div>
@@ -175,11 +135,7 @@ const ChatRoom = () => {
         {/* Room Info Bar */}
         <div className="bg-base-100 p-4 flex items-center justify-between border-t border-base-300">
           <div className="flex items-center gap-4">
-            <h2 className="text-xl font-semibold">Room {roomId}</h2>
-            <div className="flex items-center gap-2">
-              <Users className="size-5" />
-              <span>{messages.length} messages</span>
-            </div>
+            <h2 className="text-xl font-semibold">Video Chat Room {roomId}</h2>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -195,12 +151,6 @@ const ChatRoom = () => {
             >
               <Users className="size-5" />
             </button>
-            <button
-              onClick={() => setShowSidePanel(!showSidePanel)}
-              className="btn btn-ghost btn-circle"
-            >
-              <MoreVertical className="size-5" />
-            </button>
             <button className="btn btn-ghost btn-circle">
               <Settings className="size-5" />
             </button>
@@ -208,41 +158,22 @@ const ChatRoom = () => {
         </div>
       </div>
 
-      {/* Side Panel */}
-      {showSidePanel && (
-        <div className="w-full lg:w-1/4 h-full flex flex-col">
-          {/* Participants Panel */}
-          {showParticipants && (
-            <div className="bg-base-100 border-b border-base-300 p-4">
-              <h3 className="font-semibold mb-3">Participants ({messages.length}/10)</h3>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {messages.map((message) => (
-                  <div key={message._id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-base-200">
-                    <div className="avatar">
-                      <div className="w-8 h-8 rounded-full">
-                        <img src={message.profilePic} alt={message.userName} />
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{message.userName}</p>
-                      <p className="text-xs opacity-70">{message.isAdmin ? 'Admin' : 'Participant'}</p>
-                    </div>
-                    {message.isAdmin && (
-                      <span className="badge badge-primary badge-sm">Admin</span>
-                    )}
-                  </div>
-                ))}
+      {/* Participants Panel */}
+      {showParticipants && (
+        <div className="w-80 bg-base-100 border-l border-base-300 p-4">
+          <h3 className="font-semibold mb-3">Participants</h3>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 p-2 rounded-lg hover:bg-base-200">
+              <div className="avatar">
+                <div className="w-8 h-8 rounded-full">
+                  <img src={user.profilePic} alt={user.fullName} />
+                </div>
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium">{user.fullName}</p>
+                <p className="text-xs opacity-70">You</p>
               </div>
             </div>
-          )}
-
-          {/* Chat Panel */}
-          <div className="flex-1">
-            <ChatSidePanel
-              messages={messages}
-              onSendMessage={handleSendMessage}
-              currentUser={user}
-            />
           </div>
         </div>
       )}

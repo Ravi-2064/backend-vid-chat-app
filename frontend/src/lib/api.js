@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 // Create axios instance with default config
 const api = axios.create({
@@ -18,19 +18,29 @@ api.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
+}, (error) => {
+  return Promise.reject(error);
 });
 
 // Add response interceptor for error handling
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (error.code === 'ERR_NETWORK') {
+      console.error('Network error:', error);
+      throw new Error('Unable to connect to the server. Please check your internet connection.');
+    }
+    
     if (error.response?.status === 401) {
       // Handle unauthorized access
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       window.location.href = "/login";
     }
-    return Promise.reject(error);
+    
+    // Handle other errors
+    const errorMessage = error.response?.data?.message || error.message || 'An error occurred';
+    throw new Error(errorMessage);
   }
 );
 
@@ -44,22 +54,10 @@ const handleResponse = async (response) => {
 };
 
 // Authentication API calls
-export const login = async ({ email, password }) => {
+export const login = async (credentials) => {
   try {
-    const response = await fetch(`${API_URL}/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify({ email, password }),
-    });
-
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.message || 'Login failed');
-    }
+    const response = await api.post("/auth/login", credentials);
+    const data = response.data;
     
     if (!data.success) {
       throw new Error(data.message || 'Login failed');
@@ -80,48 +78,47 @@ export const login = async ({ email, password }) => {
 };
 
 export const register = async (userData) => {
-  const response = await fetch(`${API_URL}/auth/signup`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(userData),
-  });
-  return handleResponse(response);
+  try {
+    const response = await api.post("/auth/signup", userData);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Registration failed");
+  }
 };
 
 export const logout = async () => {
-  const token = localStorage.getItem('token');
-  const response = await fetch(`${API_URL}/auth/logout`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  });
-  return handleResponse(response);
+  try {
+    const response = await api.post("/auth/logout");
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Logout failed");
+  }
 };
 
 // User Profile API calls
 export const getAuthUser = async () => {
   try {
     const response = await api.get("/users/profile");
-    return response.data;
+    return {
+      success: true,
+      user: response.data
+    };
   } catch (error) {
-    throw new Error(error.response?.data?.message || "Failed to fetch user profile");
+    console.error('Error fetching user profile:', error);
+    return {
+      success: false,
+      message: error.message || "Failed to fetch user profile"
+    };
   }
 };
 
 export const updateUserProfile = async (userData) => {
-  const token = localStorage.getItem('token');
-  const response = await fetch(`${API_URL}/users/profile`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify(userData),
-  });
-  return handleResponse(response);
+  try {
+    const response = await api.put("/users/profile", userData);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to update profile");
+  }
 };
 
 // Blog API calls
@@ -183,64 +180,83 @@ export const updateActivityStats = async (statsData) => {
 // Friends API calls
 export const getUserFriends = async () => {
   try {
-    const response = await api.get("/users/friends");
-    return response.data;
+    const response = await api.get('/users/friends');
+    return {
+      success: true,
+      data: response.data
+    };
   } catch (error) {
-    throw new Error(error.response?.data?.message || "Failed to fetch friends");
+    console.error('Error fetching friends:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to fetch friends'
+    };
   }
 };
 
 export const getFriendRequests = async () => {
   try {
-    const response = await api.get("/users/friend-requests");
+    const response = await api.get('/users/friend-requests');
     return response.data;
   } catch (error) {
-    throw new Error(error.response?.data?.message || "Failed to fetch friend requests");
+    console.error('Error fetching friend requests:', error);
+    throw new Error('Failed to fetch friend requests');
   }
 };
 
 export const sendFriendRequest = async (userId) => {
   try {
-    const response = await api.post(`/users/friend-requests/${userId}`);
+    const response = await api.post(`/users/friend-request/${userId}`);
     return response.data;
   } catch (error) {
-    throw new Error(error.response?.data?.message || "Failed to send friend request");
+    console.error('Error sending friend request:', error);
+    throw new Error('Failed to send friend request');
   }
 };
 
 export const acceptFriendRequest = async (requestId) => {
   try {
-    const response = await api.put(`/users/friend-requests/${requestId}/accept`);
+    const response = await api.put(`/users/friend-request/${requestId}/accept`);
     return response.data;
   } catch (error) {
-    throw new Error(error.response?.data?.message || "Failed to accept friend request");
+    console.error('Error accepting friend request:', error);
+    throw new Error('Failed to accept friend request');
   }
 };
 
 export const rejectFriendRequest = async (requestId) => {
   try {
-    const response = await api.put(`/users/friend-requests/${requestId}/reject`);
+    const response = await api.put(`/users/friend-request/${requestId}/reject`);
     return response.data;
   } catch (error) {
-    throw new Error(error.response?.data?.message || "Failed to reject friend request");
+    console.error('Error rejecting friend request:', error);
+    throw new Error('Failed to reject friend request');
   }
 };
 
 export const getOutgoingFriendReqs = async () => {
   try {
-    const response = await api.get("/users/friend-requests/outgoing");
+    const response = await api.get('/users/outgoing-friend-requests');
     return response.data;
   } catch (error) {
-    throw new Error(error.response?.data?.message || "Failed to fetch outgoing requests");
+    console.error('Error fetching outgoing friend requests:', error);
+    throw new Error('Failed to fetch outgoing friend requests');
   }
 };
 
 export const getRecommendedUsers = async () => {
   try {
-    const response = await api.get("/users/recommended");
-    return response.data;
+    const response = await api.get("/users");
+    return {
+      success: true,
+      data: response.data
+    };
   } catch (error) {
-    throw new Error(error.response?.data?.message || "Failed to fetch recommended users");
+    console.error('Error fetching recommended users:', error);
+    return {
+      success: false,
+      message: error.message || "Failed to fetch recommended users"
+    };
   }
 };
 
@@ -376,26 +392,21 @@ export const mockUpdateActivityStats = async (statsData) => {
 
 // Chat API calls
 export const getMessages = async (roomId) => {
-  const token = localStorage.getItem('token');
-  const response = await fetch(`${API_URL}/chat/messages/${roomId}`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  });
-  return handleResponse(response);
+  try {
+    const response = await api.get(`/chat/messages/${roomId}`);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to fetch messages");
+  }
 };
 
 export const sendMessage = async (roomId, message) => {
-  const token = localStorage.getItem('token');
-  const response = await fetch(`${API_URL}/chat/messages`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify({ roomId, message }),
-  });
-  return handleResponse(response);
+  try {
+    const response = await api.post("/chat/messages", { roomId, message });
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to send message");
+  }
 };
 
 export const uploadFile = async (roomId, file) => {
@@ -447,5 +458,21 @@ export const removeParticipant = async (roomId, participantId) => {
     return response.data;
   } catch (error) {
     throw new Error(error.response?.data?.message || "Failed to remove participant");
+  }
+};
+
+// Posts API calls
+export const getLatestPosts = async () => {
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+    
+    const response = await api.get('/posts/latest');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching latest posts:', error);
+    throw new Error(error.response?.data?.message || 'Failed to fetch latest posts');
   }
 };

@@ -1,5 +1,5 @@
-import mongoose from "mongoose";
-import bcrypt from "bcryptjs";
+const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 
 const userSchema = new mongoose.Schema(
   {
@@ -22,7 +22,7 @@ const userSchema = new mongoose.Schema(
     },
     profilePic: {
       type: String,
-      default: "https://ui-avatars.com/api/?size=150&name=User",
+      default: "https://via.placeholder.com/150",
     },
     backgroundImage: {
       type: String,
@@ -114,11 +114,11 @@ const userSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Hash password before saving
-userSchema.pre("save", async function (next) {
+userSchema.pre("save", async function(next) {
   if (!this.isModified("password")) return next();
 
   try {
@@ -131,7 +131,7 @@ userSchema.pre("save", async function (next) {
 });
 
 // Compare password method
-userSchema.methods.comparePassword = async function (candidatePassword) {
+userSchema.methods.comparePassword = async function(candidatePassword) {
   try {
     return await bcrypt.compare(candidatePassword, this.password);
   } catch (error) {
@@ -141,4 +141,4 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 
 const User = mongoose.model("User", userSchema);
 
-export default User;
+module.exports = User;

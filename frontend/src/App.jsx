@@ -10,6 +10,7 @@ import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ChatRoom from './pages/ChatRoom';
+import TextChatRoom from './pages/TextChatRoom';
 import VideoChatRoom from './pages/VideoChatRoom';
 import FriendsPage from './pages/FriendsPage';
 import UserSettings from './pages/UserSettings';
@@ -78,7 +79,7 @@ function App() {
                     element={
                       <PrivateRoute>
                         <ErrorBoundary>
-                          <ChatRoom />
+                          <TextChatRoom />
                         </ErrorBoundary>
                       </PrivateRoute>
                     }

@@ -1,9 +1,9 @@
-const asyncHandler = require('express-async-handler');
-const ChatRoom = require('../models/ChatRoom');
-const { v4: uuidv4 } = require('uuid');
+import asyncHandler from 'express-async-handler';
+import ChatRoom from '../models/ChatRoom.js';
+import { v4 as uuidv4 } from 'uuid';
 
 // Create a new chat room
-const createRoom = asyncHandler(async (req, res) => {
+export const createRoom = asyncHandler(async (req, res) => {
   const { name } = req.body;
   const roomId = uuidv4();
 
@@ -21,7 +21,7 @@ const createRoom = asyncHandler(async (req, res) => {
 });
 
 // Get room details
-const getRoom = asyncHandler(async (req, res) => {
+export const getRoom = asyncHandler(async (req, res) => {
   const room = await ChatRoom.findOne({ roomId: req.params.roomId })
     .populate('participants.user', 'fullName profilePic')
     .populate('messages.sender', 'fullName profilePic');
@@ -35,7 +35,7 @@ const getRoom = asyncHandler(async (req, res) => {
 });
 
 // Get room participants
-const getRoomParticipants = asyncHandler(async (req, res) => {
+export const getRoomParticipants = asyncHandler(async (req, res) => {
   const room = await ChatRoom.findOne({ roomId: req.params.roomId })
     .populate('participants.user', 'fullName profilePic');
 
@@ -48,7 +48,7 @@ const getRoomParticipants = asyncHandler(async (req, res) => {
 });
 
 // Join room
-const joinRoom = asyncHandler(async (req, res) => {
+export const joinRoom = asyncHandler(async (req, res) => {
   const room = await ChatRoom.findOne({ roomId: req.params.roomId });
 
   if (!room) {
@@ -86,7 +86,7 @@ const joinRoom = asyncHandler(async (req, res) => {
 });
 
 // Leave room
-const leaveRoom = asyncHandler(async (req, res) => {
+export const leaveRoom = asyncHandler(async (req, res) => {
   const room = await ChatRoom.findOne({ roomId: req.params.roomId });
 
   if (!room) {
@@ -125,7 +125,7 @@ const leaveRoom = asyncHandler(async (req, res) => {
 });
 
 // Remove participant (admin only)
-const removeParticipant = asyncHandler(async (req, res) => {
+export const removeParticipant = asyncHandler(async (req, res) => {
   const room = await ChatRoom.findOne({ roomId: req.params.roomId });
 
   if (!room) {
@@ -158,7 +158,7 @@ const removeParticipant = asyncHandler(async (req, res) => {
 });
 
 // Send message
-const sendMessage = asyncHandler(async (req, res) => {
+export const sendMessage = asyncHandler(async (req, res) => {
   const { content, type = 'text', fileUrl } = req.body;
   const room = await ChatRoom.findOne({ roomId: req.params.roomId });
 
@@ -189,7 +189,7 @@ const sendMessage = asyncHandler(async (req, res) => {
 });
 
 // Get messages
-const getMessages = asyncHandler(async (req, res) => {
+export const getMessages = asyncHandler(async (req, res) => {
   const room = await ChatRoom.findOne({ roomId: req.params.roomId })
     .populate('messages.sender', 'fullName profilePic');
 
@@ -199,15 +199,4 @@ const getMessages = asyncHandler(async (req, res) => {
   }
 
   res.json(room.messages);
-});
-
-module.exports = {
-  createRoom,
-  getRoom,
-  getRoomParticipants,
-  joinRoom,
-  leaveRoom,
-  removeParticipant,
-  sendMessage,
-  getMessages
-}; 
+}); 

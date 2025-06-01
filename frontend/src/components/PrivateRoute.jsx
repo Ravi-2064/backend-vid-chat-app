@@ -5,8 +5,6 @@ const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
   
-  console.log('PrivateRoute - Auth state:', { user, loading, location });
-  
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-primary">
@@ -18,8 +16,6 @@ const PrivateRoute = ({ children }) => {
   // Check both user object and token
   const token = localStorage.getItem('token');
   const isAuthenticated = user && token;
-  
-  console.log('PrivateRoute - Auth check:', { isAuthenticated, user, token });
   
   if (!isAuthenticated) {
     // Clear any stale data

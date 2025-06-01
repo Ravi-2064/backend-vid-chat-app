@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const chatRoomSchema = new mongoose.Schema({
   roomId: {
@@ -70,4 +70,4 @@ chatRoomSchema.index({ 'participants.user': 1 });
 
 const ChatRoom = mongoose.model('ChatRoom', chatRoomSchema);
 
-module.exports = ChatRoom; 
+export default ChatRoom; 

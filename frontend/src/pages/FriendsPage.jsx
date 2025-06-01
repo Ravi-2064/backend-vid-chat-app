@@ -107,7 +107,7 @@ const FriendsPage = () => {
                       <div className="avatar">
                         <div className="w-12 h-12 rounded-full">
                           <img
-                            src={request.sender.profilePic || "https://via.placeholder.com/150"}
+                            src={request.sender.profilePic || `https://ui-avatars.com/api/?size=150&name=${encodeURIComponent(request.sender.name || 'User')}`}
                             alt={request.sender.fullName}
                           />
                         </div>

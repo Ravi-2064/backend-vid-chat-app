@@ -4,20 +4,11 @@ import { useAuth } from './AuthContext';
 import { toast } from 'react-hot-toast';
 import { handleNetworkError } from '../utils/errorHandler';
 
-// Create and export the context
+// Create the context
 export const SocketContext = createContext(null);
 
-// Create and export the hook
-export const useSocket = () => {
-  const context = useContext(SocketContext);
-  if (!context) {
-    throw new Error('useSocket must be used within a SocketProvider');
-  }
-  return context;
-};
-
-// Create and export the provider component
-export const SocketProvider = ({ children }) => {
+// Create the provider component
+export function SocketProvider({ children }) {
   const { user } = useAuth();
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -98,4 +89,13 @@ export const SocketProvider = ({ children }) => {
       {children}
     </SocketContext.Provider>
   );
-}; 
+}
+
+// Create the hook
+export function useSocket() {
+  const context = useContext(SocketContext);
+  if (!context) {
+    throw new Error('useSocket must be used within a SocketProvider');
+  }
+  return context;
+} 

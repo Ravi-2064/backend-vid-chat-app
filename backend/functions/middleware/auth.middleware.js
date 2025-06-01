@@ -1,11 +1,9 @@
-import jwt from "jsonwebtoken";
-import User from "../models/User.js";
-import { upsertStreamUser } from "../lib/stream.js";
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
 
-export const protectRoute = async (req, res, next) => {
+const protectRoute = async(req, res, next) => {
   try {
-    // Check for token in cookies or Authorization header
-    const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
+    const token = req.cookies.token;
 
     if (!token) {
       return res.status(401).json({ message: "Unauthorized - No token provided" });
@@ -31,3 +29,5 @@ export const protectRoute = async (req, res, next) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+module.exports = { protectRoute };

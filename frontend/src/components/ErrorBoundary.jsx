@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 
@@ -29,8 +29,10 @@ class ErrorBoundary extends React.Component {
 function ErrorFallback({ error }) {
   const navigate = useNavigate();
 
-  // Show a toast notification
-  toast.error('Something went wrong. Please try again.');
+  useEffect(() => {
+    // Show a toast notification
+    toast.error('Something went wrong. Please try again.');
+  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">

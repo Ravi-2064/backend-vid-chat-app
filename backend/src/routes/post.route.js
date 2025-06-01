@@ -96,4 +96,19 @@ router.post('/:postId/like', protectRoute, async (req, res) => {
   }
 });
 
+// Get latest posts
+router.get('/latest', protectRoute, async (req, res) => {
+  try {
+    const posts = await Post.find()
+      .populate('author', 'name email avatar')
+      .populate('comments.author', 'name email avatar')
+      .sort({ createdAt: -1 })
+      .limit(10);
+    res.json(posts);
+  } catch (error) {
+    console.error('Error fetching latest posts:', error);
+    res.status(500).json({ message: 'Error fetching latest posts' });
+  }
+});
+
 export default router; 

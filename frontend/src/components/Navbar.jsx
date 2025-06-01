@@ -88,7 +88,7 @@ const Navbar = () => {
                 onClick={() => setShowUserMenu(!showUserMenu)}
               >
                 <img
-                  src={user.avatar || 'https://via.placeholder.com/32'}
+                  src={user.avatar || 'https://ui-avatars.com/api/?size=32&name=' + encodeURIComponent(user.name || 'User')}
                   alt={user.name}
                   className="w-10 h-10 rounded-full border-2 border-purple-100 hover:border-purple-300 transition-all duration-200"
                 />

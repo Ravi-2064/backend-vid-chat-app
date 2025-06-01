@@ -4,9 +4,10 @@ import { useMutation } from '@tanstack/react-query';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
 import { handleAuthError, handleValidationError } from '../utils/errorHandler';
-import axios from 'axios';
+import { login as apiLogin } from '../lib/api';
 import { FaGithub, FaFacebook } from 'react-icons/fa';
 import { FaEye, FaEyeSlash } from 'react-icons/fa';
+import axios from 'axios';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -22,8 +23,7 @@ const LoginPage = () => {
   const loginMutation = useMutation({
     mutationFn: async (credentials) => {
       try {
-        const response = await axios.post('http://localhost:5000/api/auth/login', credentials);
-        return response.data;
+        await login(credentials);
       } catch (error) {
         if (error.response?.status === 401) {
           throw new Error('Invalid email or password');
@@ -31,8 +31,7 @@ const LoginPage = () => {
         throw error;
       }
     },
-    onSuccess: (data) => {
-      login(data);
+    onSuccess: () => {
       navigate('/home');
     },
     onError: (error) => {
@@ -45,6 +44,8 @@ const LoginPage = () => {
       try {
         const response = await axios.post('http://localhost:5000/api/auth/google', {
           credential: credentialResponse.credential
+        }, {
+          withCredentials: true
         });
         return response.data;
       } catch (error) {

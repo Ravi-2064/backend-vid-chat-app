@@ -1,42 +1,51 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { handleAuthError, handleNetworkError } from '../utils/errorHandler';
-import axios from 'axios';
+import { register as apiRegister, login as apiLogin, getAuthUser } from '../lib/api';
 
-// Create and export the context
+// Create the context
 export const AuthContext = createContext(null);
 
-// Create and export the hook
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-// Create and export the provider component
-export const AuthProvider = ({ children }) => {
+// Create the provider component
+export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
-    
-    if (storedUser && token) {
+    const initializeAuth = async () => {
       try {
-        setUser(JSON.parse(storedUser));
+        const storedUser = localStorage.getItem('user');
+        const token = localStorage.getItem('token');
+        
+        if (storedUser && token) {
+          try {
+            // Verify the token by making an API call
+            const { success, user: currentUser } = await getAuthUser();
+            if (success && currentUser) {
+              setUser(currentUser);
+            } else {
+              // If token is invalid, clear storage
+              localStorage.removeItem('user');
+              localStorage.removeItem('token');
+            }
+          } catch (error) {
+            console.error('Error verifying auth:', error);
+            localStorage.removeItem('user');
+            localStorage.removeItem('token');
+          }
+        }
       } catch (error) {
-        console.error('Error parsing stored user:', error);
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
+        console.error('Error initializing auth:', error);
+      } finally {
+        setLoading(false);
       }
-    }
-    setLoading(false);
+    };
+
+    initializeAuth();
   }, []);
 
-  const login = async (data) => {
+  const login = async (credentials) => {
     try {
+      const data = await apiLogin(credentials);
       if (!data.token || !data.user) {
         throw new Error('Invalid authentication data');
       }
@@ -44,9 +53,6 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       setUser(data.user);
-
-      // Set default authorization header for all future requests
-      axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
     } catch (error) {
       handleAuthError(error);
       throw error;
@@ -58,7 +64,6 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       setUser(null);
-      delete axios.defaults.headers.common['Authorization'];
     } catch (error) {
       handleNetworkError(error);
     }
@@ -66,8 +71,8 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/register', userData);
-      return response.data;
+      const data = await apiRegister(userData);
+      return data;
     } catch (error) {
       handleAuthError(error);
       throw error;
@@ -84,7 +89,16 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
-}; 
+}
+
+// Create the hook
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+} 

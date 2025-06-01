@@ -13,7 +13,7 @@ const useAuthUser = () => {
     id: '1',
     name: 'Demo User',
     email: 'demo@example.com',
-    profilePic: 'https://via.placeholder.com/150',
+    profilePic: `https://ui-avatars.com/api/?size=150&name=${encodeURIComponent(data?.user?.name || 'User')}`,
   };
 
   return { authUser: data?.user || mockUser, isLoading, error };
