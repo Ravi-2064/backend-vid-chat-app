@@ -20,7 +20,7 @@ const LandingPage = () => {
               to="/login"
               className="px-10 py-4 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-700 transition-all shadow-lg text-lg"
             >
-              Get Started
+              Sign In
             </Link>
             <Link
               to="/register"

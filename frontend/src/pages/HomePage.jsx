@@ -6,42 +6,83 @@ import {
   getUserFriends,
   sendFriendRequest,
   getFriendRequests,
+  getAuthUser,
+  updateActivityStats
 } from "../lib/api";
 import { Link } from "react-router-dom";
-import { CheckCircleIcon, MapPinIcon, UserPlusIcon, UsersIcon } from "lucide-react";
-
+import { CheckCircleIcon, MapPinIcon, UserPlusIcon, UsersIcon, ShipWheelIcon, HomeIcon, User, Settings, Activity, MessageSquare, Clock, BookOpen } from "lucide-react";
 import { capitialize } from "../lib/utils";
-
 import FriendCard, { getLanguageFlag } from "../components/FriendCard";
 import NoFriendsFound from "../components/NoFriendsFound";
+import Navbar from "../components/Navbar";
+import SignupOverlay from "../components/SignupOverlay";
+import Logo from "../components/Logo";
+import UserSettings from '../components/UserSettings';
+import HamburgerMenu from '../components/HamburgerMenu';
+import useLogout from '../hooks/useLogout';
+import { useAuth } from '../contexts/AuthContext';
+import { useSocket } from '../contexts/SocketContext';
+import { FaHeart, FaComment, FaShare, FaVideo, FaUserFriends, FaCog, FaSync } from 'react-icons/fa';
+import { toast } from 'react-hot-toast';
 
 const HomePage = () => {
   const queryClient = useQueryClient();
   const [outgoingRequestsIds, setOutgoingRequestsIds] = useState(new Set());
+  const [showSignupOverlay, setShowSignupOverlay] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const { mutate: logout } = useLogout();
+  const { user } = useAuth();
+  const { socket, isConnected, reconnect } = useSocket();
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const { data: friends = [], isLoading: loadingFriends } = useQuery({
-    queryKey: ["friends"],
-    queryFn: getUserFriends,
+  // Get current user
+  const { data: authData, error: authError } = useQuery({
+    queryKey: ["authUser"],
+    queryFn: getAuthUser,
+    retry: 1
   });
 
-  const { data: recommendedUsers = [], isLoading: loadingUsers } = useQuery({
+  const currentUser = authData?.user;
+
+  const { data: friends = [], isLoading: loadingFriends, error: friendsError } = useQuery({
+    queryKey: ["friends"],
+    queryFn: getUserFriends,
+    enabled: !!currentUser
+  });
+
+  const { data: recommendedUsers = [], isLoading: loadingUsers, error: usersError } = useQuery({
     queryKey: ["users"],
     queryFn: getRecommendedUsers,
+    enabled: !!currentUser
   });
 
   const { data: outgoingFriendReqs } = useQuery({
     queryKey: ["outgoingFriendReqs"],
     queryFn: getOutgoingFriendReqs,
+    enabled: !!currentUser
   });
 
-  const { data: friendRequests, isLoading: loadingFriendRequests } = useQuery({
+  const { data: friendRequests } = useQuery({
     queryKey: ["friendRequests"],
     queryFn: getFriendRequests,
+    enabled: !!currentUser
   });
 
   const { mutate: sendRequestMutation, isPending } = useMutation({
     mutationFn: sendFriendRequest,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["outgoingFriendReqs"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["outgoingFriendReqs"] });
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    }
+  });
+
+  // Update activity stats mutation
+  const { mutate: updateStatsMutation } = useMutation({
+    mutationFn: updateActivityStats,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["authUser"] });
+    }
   });
 
   useEffect(() => {
@@ -54,199 +95,308 @@ const HomePage = () => {
     }
   }, [outgoingFriendReqs]);
 
+  // Update activity stats periodically
+  useEffect(() => {
+    if (currentUser) {
+      const interval = setInterval(() => {
+        updateStatsMutation({
+          friendsCount: friends.length,
+          messagesCount: currentUser.messagesCount || 0,
+          practiceHours: currentUser.practiceHours || 0
+        });
+      }, 300000); // Update every 5 minutes
+
+      return () => clearInterval(interval);
+    }
+  }, [currentUser, friends.length, updateStatsMutation]);
+
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/posts', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch posts');
+        }
+
+        const data = await response.json();
+        setPosts(data);
+      } catch (error) {
+        console.error('Error fetching posts:', error);
+        toast.error('Failed to load posts');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPosts();
+  }, []);
+
+  const handleLike = async (postId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/posts/${postId}/like`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (!response.ok) throw new Error('Failed to like post');
+      
+      setPosts(posts.map(post => 
+        post._id === postId 
+          ? { ...post, likes: [...post.likes, user._id] }
+          : post
+      ));
+      toast.success('Post liked successfully');
+    } catch (error) {
+      toast.error('Failed to like post');
+      console.error('Error liking post:', error);
+    }
+  };
+
+  if (authError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-base-100 via-base-200 to-base-300 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4 text-error">Authentication Error</h1>
+          <p className="mb-4">{authError.message}</p>
+          <Link to="/login" className="btn btn-primary">Go to Login</Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-base-100 via-base-200 to-base-300 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Please log in to continue</h1>
+          <Link to="/login" className="btn btn-primary">Go to Login</Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 sm:p-10 lg:p-16 bg-gradient-to-br from-white via-blue-50 to-blue-100 min-h-screen">
-      <div className="container mx-auto space-y-12">
-        {/* DASHBOARD HEADER */}
-        <div className="mb-10">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
-            <div>
-              <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-2 text-blue-900">Welcome back!</h1>
-              <p className="text-base-content opacity-70 text-lg">Here's your language learning dashboard.</p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Connection Status */}
+      {!isConnected && (
+        <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <p className="font-bold">Connection Lost</p>
+              <p className="ml-2">You are currently offline</p>
             </div>
-            <div className="flex gap-6 mt-6 md:mt-0">
-              <div className="card bg-white shadow-lg px-8 py-5 flex flex-col items-center border border-blue-100 group relative w-40 text-center">
-                <span className="font-bold text-2xl text-blue-700">{friends.length}</span>
-                <span className="text-xs opacity-70">Current Friends</span>
-                <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-blue-800 text-white px-3 py-1 rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                  Your current friend connections
-                </div>
-              </div>
-              <div className="card bg-white shadow-lg px-8 py-5 flex flex-col items-center border border-blue-100 group relative w-40 text-center">
-                <span className="font-bold text-2xl text-blue-700">{outgoingFriendReqs?.length || 0}</span>
-                <span className="text-xs opacity-70">Sent Requests</span>
-                <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-blue-800 text-white px-3 py-1 rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                  Friend requests you've sent
-                </div>
-              </div>
-              <div className="card bg-white shadow-lg px-8 py-5 flex flex-col items-center border border-blue-100 group relative w-40 text-center">
-                <span className="font-bold text-2xl text-blue-700">{recommendedUsers.length}</span>
-                <span className="text-xs opacity-70">Friend Suggestions</span>
-                <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-blue-800 text-white px-3 py-1 rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                  New people you can connect with
-                </div>
-              </div>
-              <div className="card bg-white shadow-lg px-8 py-5 flex flex-col items-center border border-blue-100 group relative w-40 text-center">
-                <span className="font-bold text-2xl text-blue-700">{friendRequests?.incomingReqs?.length || 0}</span>
-                <span className="text-xs opacity-70">Received Requests</span>
-                <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-blue-800 text-white px-3 py-1 rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                  Friend requests you have received
-                </div>
-              </div>
-            </div>
+            <button
+              onClick={reconnect}
+              className="flex items-center px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all duration-200"
+            >
+              <FaSync className="mr-2" />
+              Reconnect
+            </button>
           </div>
         </div>
+      )}
 
-        {/* FRIENDS SECTION */}
-        <div className="card bg-white shadow-xl p-8 border border-blue-100 mb-10">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 mb-8">
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight flex items-center gap-4 text-blue-800">
-              <UsersIcon className="size-8 text-blue-400" /> Your Friends
-            </h2>
-            <Link to="/notifications" className="btn btn-outline btn-lg flex items-center gap-2">
-              <UsersIcon className="mr-2 size-5" />
-              Friend Requests
-            </Link>
-          </div>
-          {loadingFriends ? (
-            <div className="flex justify-center py-12">
-              <span className="loading loading-spinner loading-lg" />
-            </div>
-          ) : friends.length === 0 ? (
-            <NoFriendsFound />
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {friends.map((friend) => (
-                <FriendCard key={friend._id} friend={friend} />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* RECOMMENDATIONS SECTION */}
-        <div className="card bg-white shadow-xl p-6 border border-blue-100">
-          <div className="mb-4 sm:mb-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Suggested Friends</h2>
-                <p className="opacity-70 text-sm">
-                  Discover perfect language exchange partners based on your profile
-                </p>
-              </div>
+      {/* Hero Section */}
+      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-24">
+        <div className="container mx-auto px-4">
+          <div className="max-w-3xl">
+            <h1 className="text-4xl md:text-6xl font-bold mb-6">
+              Welcome back, {user.name}! 👋
+            </h1>
+            <p className="text-xl md:text-2xl mb-8 text-purple-100">
+              Connect with friends, share your moments, and start streaming together
+            </p>
+            <div className="flex flex-wrap gap-4">
+              <Link
+                to="/chat"
+                className="bg-white text-purple-600 px-8 py-4 rounded-xl font-semibold hover:bg-purple-50 transition-all duration-200 shadow-lg hover:shadow-xl"
+              >
+                Start Chatting
+              </Link>
+              <Link
+                to="/video-chat"
+                className="bg-transparent border-2 border-white px-8 py-4 rounded-xl font-semibold hover:bg-white hover:text-purple-600 transition-all duration-200"
+              >
+                Video Chat
+              </Link>
             </div>
           </div>
-          {loadingUsers ? (
-            <div className="flex justify-center py-8">
-              <span className="loading loading-spinner loading-md" />
-            </div>
-          ) : recommendedUsers.length === 0 ? (
-            <div className="card bg-base-100 p-4 text-center">
-              <h3 className="font-semibold text-base mb-2">No recommendations available</h3>
-              <p className="text-base-content opacity-70 text-sm">
-                Check back later for new language partners!
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {recommendedUsers.map((user) => {
-                const hasRequestBeenSent = outgoingRequestsIds.has(user._id);
-                return (
-                  <div
-                    key={user._id}
-                    className="card bg-base-100 hover:shadow-lg transition-all duration-300 border border-base-300"
-                  >
-                    <div className="card-body p-5 space-y-4">
-                      <div className="flex items-center gap-3">
-                        <div className="avatar size-16 rounded-full">
-                          <img
-                            src={user.profilePic || "https://via.placeholder.com/100?text=Avatar"}
-                            alt={user.fullName}
-                            onError={e => { e.target.onerror = null; e.target.src = "https://via.placeholder.com/100?text=Avatar"; }}
-                          />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-lg">{user.fullName}</h3>
-                          {user.location && (
-                            <div className="flex items-center text-xs opacity-70 mt-1">
-                              <MapPinIcon className="size-3 mr-1" />
-                              {user.location}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        <span className="badge badge-secondary">
-                          {getLanguageFlag(user.nativeLanguage)}
-                          Native: {capitialize(user.nativeLanguage)}
-                        </span>
-                        <span className="badge badge-outline">
-                          {getLanguageFlag(user.learningLanguage)}
-                          Learning: {capitialize(user.learningLanguage)}
-                        </span>
-                      </div>
-                      {user.bio && <p className="text-sm opacity-70">{user.bio}</p>}
-                      <button
-                        className={`btn w-full mt-2 ${
-                          hasRequestBeenSent ? "btn-disabled" : "btn-primary"
-                        } `}
-                        onClick={() => sendRequestMutation(user._id)}
-                        disabled={hasRequestBeenSent || isPending}
-                      >
-                        {hasRequestBeenSent ? (
-                          <>
-                            <CheckCircleIcon className="size-4 mr-2" />
-                            Request Sent
-                          </>
-                        ) : (
-                          <>
-                            <UserPlusIcon className="size-4 mr-2" />
-                            Send Friend Request
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       </div>
 
-      {/* FOOTER SECTION */}
-      <footer className="footer p-10 bg-base-200 text-base-content mt-12">
-        <nav>
-          <h6 className="footer-title">About</h6>
-          <a className="link link-hover">About Us</a>
-          <a className="link link-hover">Careers</a>
-          <a className="link link-hover">Press Kit</a>
-        </nav>
-        <nav>
-          <h6 className="footer-title">Legal</h6>
-          <a className="link link-hover">Terms of use</a>
-          <a className="link link-hover">Privacy policy</a>
-          <a className="link link-hover">Cookie policy</a>
-        </nav>
-        <nav>
-          <h6 className="footer-title">Stay Updated</h6>
-          <div className="form-control w-full max-w-xs">
-            <div className="join">
-              <input
-                type="email"
-                placeholder="Enter your email"
-                className="input input-bordered join-item w-full"
-              />
-              <button className="btn btn-primary join-item">Subscribe</button>
+      {/* Main Content */}
+      <div className="container mx-auto px-4 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Left Sidebar - Quick Actions */}
+          <div className="space-y-6">
+            <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
+              <h2 className="text-xl font-semibold mb-6 text-gray-800">Quick Actions</h2>
+              <div className="space-y-3">
+                <Link
+                  to="/friends"
+                  className="flex items-center gap-3 p-3 hover:bg-purple-50 rounded-xl transition-all duration-200 group"
+                >
+                  <div className="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-all duration-200">
+                    <FaUserFriends className="text-purple-600" />
+                  </div>
+                  <span className="text-gray-700 group-hover:text-purple-600">Friends List</span>
+                </Link>
+                <Link
+                  to="/chat"
+                  className="flex items-center gap-3 p-3 hover:bg-purple-50 rounded-xl transition-all duration-200 group"
+                >
+                  <div className="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-all duration-200">
+                    <FaComment className="text-purple-600" />
+                  </div>
+                  <span className="text-gray-700 group-hover:text-purple-600">Chat</span>
+                </Link>
+                <Link
+                  to="/video-chat"
+                  className="flex items-center gap-3 p-3 hover:bg-purple-50 rounded-xl transition-all duration-200 group"
+                >
+                  <div className="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-all duration-200">
+                    <FaVideo className="text-purple-600" />
+                  </div>
+                  <span className="text-gray-700 group-hover:text-purple-600">Video Chat</span>
+                </Link>
+              </div>
             </div>
-            <p className="text-sm opacity-70 mt-2">Get notified about new messages and friend requests</p>
+
+            {/* Activity Stats */}
+            <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
+              <h2 className="text-xl font-semibold mb-6 text-gray-800">Your Activity</h2>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <FaUserFriends className="text-purple-600" />
+                    <span className="text-gray-700">Friends</span>
+                  </div>
+                  <span className="font-semibold text-gray-900">{friends.length}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <FaComment className="text-purple-600" />
+                    <span className="text-gray-700">Messages</span>
+                  </div>
+                  <span className="font-semibold text-gray-900">{currentUser?.messagesCount || 0}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <FaVideo className="text-purple-600" />
+                    <span className="text-gray-700">Practice Hours</span>
+                  </div>
+                  <span className="font-semibold text-gray-900">{currentUser?.practiceHours || 0}</span>
+                </div>
+              </div>
+            </div>
           </div>
-        </nav>
-      </footer>
-      {/* COPYRIGHT SECTION */}
-      <div className="footer footer-center p-4 bg-base-300 text-base-content">
-        <aside>
-          <p>Copyright © 2023 - All right reserved by Your Company Name</p>
-        </aside>
+
+          {/* Main Feed */}
+          <div className="md:col-span-2 space-y-6">
+            {/* Posts Section */}
+            <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
+              <h2 className="text-xl font-semibold mb-6 text-gray-800">Recent Posts</h2>
+              {loading ? (
+                <div className="flex justify-center items-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                </div>
+              ) : posts.length > 0 ? (
+                <div className="space-y-6">
+                  {posts.map((post) => (
+                    <div key={post._id} className="bg-gray-50 rounded-xl p-6">
+                      <div className="flex items-center gap-4 mb-4">
+                        <img
+                          src={`https://ui-avatars.com/api/?name=${post.author.name}&background=random`}
+                          alt={post.author.name}
+                          className="w-8 h-8 rounded-full"
+                        />
+                        <div>
+                          <h3 className="font-semibold text-gray-900">{post.author.name}</h3>
+                          <p className="text-sm text-gray-500">
+                            {new Date(post.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-gray-700 mb-4">{post.content}</p>
+                      <div className="flex items-center gap-6">
+                        <button
+                          onClick={() => handleLike(post._id)}
+                          className="flex items-center gap-2 text-gray-500 hover:text-purple-600 transition-all duration-200"
+                        >
+                          <FaHeart className={post.likes.includes(user._id) ? 'text-red-500' : ''} />
+                          <span>{post.likes.length}</span>
+                        </button>
+                        <button className="flex items-center gap-2 text-gray-500 hover:text-purple-600 transition-all duration-200">
+                          <FaComment />
+                          <span>{post.comments?.length || 0}</span>
+                        </button>
+                        <button className="flex items-center gap-2 text-gray-500 hover:text-purple-600 transition-all duration-200">
+                          <FaShare />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  No posts yet. Be the first to share something!
+                </div>
+              )}
+            </div>
+
+            {/* Recommended Friends */}
+            <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
+              <h2 className="text-xl font-semibold mb-6 text-gray-800">Recommended Friends</h2>
+              {loadingUsers ? (
+                <div className="flex justify-center items-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                </div>
+              ) : recommendedUsers.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {recommendedUsers.map((user) => (
+                    <div
+                      key={user._id}
+                      className="flex items-center justify-between p-4 bg-gray-50 rounded-xl"
+                    >
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={user.avatar || `https://ui-avatars.com/api/?name=${user.name}&background=random`}
+                          alt={user.name}
+                          className="w-10 h-10 rounded-full"
+                        />
+                        <div>
+                          <h3 className="font-medium text-gray-900">{user.name}</h3>
+                          <p className="text-sm text-gray-500">{user.email}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => sendRequestMutation(user._id)}
+                        disabled={outgoingRequestsIds.has(user._id)}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                          outgoingRequestsIds.has(user._id)
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-purple-600 text-white hover:bg-purple-700'
+                        }`}
+                      >
+                        {outgoingRequestsIds.has(user._id) ? 'Request Sent' : 'Add Friend'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  No recommended friends at the moment.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

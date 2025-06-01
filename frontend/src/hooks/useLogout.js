@@ -1,25 +1,40 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { logout } from "../lib/api";
+import toast from "react-hot-toast";
 
 const useLogout = () => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
-  const {
-    mutate: logoutMutation,
-    isPending,
-    error,
-  } = useMutation({
+  const { mutate, isPending } = useMutation({
     mutationFn: logout,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["authUser"] }),
+    onSuccess: () => {
+      // Clear all queries from the cache
+      queryClient.clear();
+      
+      // Clear localStorage
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      
+      // Show success message
+      toast.success('Logged out successfully');
+      
+      // Navigate to login page
+      navigate('/login', { replace: true });
+    },
+    onError: (error) => {
+      console.error('Logout error:', error);
+      toast.error('Failed to logout. Please try again.');
+      
+      // Still clear local storage and redirect even if the API call fails
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      navigate('/login', { replace: true });
+    }
   });
 
-  // Fallback mock logout function if the mutation fails
-  const mockLogout = () => {
-    console.log('Mock logout called');
-    queryClient.invalidateQueries({ queryKey: ["authUser"] });
-  };
-
-  return { logoutMutation: logoutMutation || mockLogout, isPending, error };
+  return { logoutMutation: mutate, isPending };
 };
 
 export default useLogout;

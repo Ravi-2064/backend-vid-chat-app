@@ -6,21 +6,18 @@ import NoNotificationsFound from "../components/NoNotificationsFound";
 const NotificationsPage = () => {
   const queryClient = useQueryClient();
 
-  const { data: friendRequests, isLoading } = useQuery({
+  const { data: friendRequests } = useQuery({
     queryKey: ["friendRequests"],
     queryFn: getFriendRequests,
   });
 
-  const { mutate: acceptRequestMutation, isPending } = useMutation({
+  const { mutate: acceptRequestMutation } = useMutation({
     mutationFn: acceptFriendRequest,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["friendRequests"] });
       queryClient.invalidateQueries({ queryKey: ["friends"] });
     },
   });
-
-  const incomingRequests = friendRequests?.incomingReqs || [];
-  const acceptedRequests = friendRequests?.acceptedReqs || [];
 
   return (
     <div className="max-w-4xl mx-auto">

@@ -1,25 +1,38 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getAuthUser, logout as logoutApi } from '../lib/api';
+import { useState, useEffect } from 'react';
+import { getAuthUser } from '../lib/api';
 
 export const useAuth = () => {
-  const queryClient = useQueryClient();
-
-  const { data: authUser, isLoading } = useQuery({
-    queryKey: ['authUser'],
-    queryFn: getAuthUser,
-    retry: false,
-    refetchOnWindowFocus: false,
-    staleTime: Infinity,
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('user');
+    return savedUser ? JSON.parse(savedUser) : null;
   });
+  const [loading, setLoading] = useState(true);
 
-  const logout = async () => {
-    await logoutApi();
-    queryClient.clear();
+  const refetchUser = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      const userData = await getAuthUser();
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+    } catch (error) {
+      console.error('Error fetching user:', error);
+      setUser(null);
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return {
-    authUser: authUser?.user || null,
-    isLoading,
-    logout,
-  };
+  useEffect(() => {
+    refetchUser();
+  }, []);
+
+  return { user, loading, refetchUser };
 }; 

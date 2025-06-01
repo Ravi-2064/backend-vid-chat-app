@@ -3,33 +3,28 @@ import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema(
   {
-    fullName: {
-      type: String,
-      required: true,
-    },
     email: {
       type: String,
-      required: true,
+      required: [true, "Email is required"],
       unique: true,
+      trim: true,
+      lowercase: true,
     },
     password: {
       type: String,
-      required: true,
-      minlength: 6,
+      required: [true, "Password is required"],
+      minlength: [6, "Password must be at least 6 characters long"],
     },
-    bio: {
+    fullName: {
       type: String,
-      default: "",
+      required: [true, "Full name is required"],
+      trim: true,
     },
     profilePic: {
       type: String,
-      default: "",
+      default: "https://via.placeholder.com/150",
     },
-    nativeLanguage: {
-      type: String,
-      default: "",
-    },
-    learningLanguage: {
+    backgroundImage: {
       type: String,
       default: "",
     },
@@ -37,20 +32,92 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
-    isOnboarded: {
+    bio: {
+      type: String,
+      default: "",
+    },
+    nativeLanguage: {
+      type: String,
+      required: [true, "Native language is required"],
+    },
+    learningLanguage: {
+      type: String,
+      required: [true, "Learning language is required"],
+    },
+    isOnline: {
       type: Boolean,
       default: false,
     },
-    friends: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
+    lastSeen: {
+      type: Date,
+      default: Date.now,
+    },
+    friends: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    }],
+    hobbies: [{
+      type: String,
+    }],
+    blogs: [{
+      title: {
+        type: String,
+        required: true,
       },
-    ],
+      content: {
+        type: String,
+        required: true,
+      },
+      date: {
+        type: Date,
+        default: Date.now,
+      },
+      likes: {
+        type: Number,
+        default: 0,
+      },
+      comments: [{
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        content: {
+          type: String,
+          required: true,
+        },
+        date: {
+          type: Date,
+          default: Date.now,
+        },
+      }],
+    }],
+    activityStats: {
+      friendsCount: {
+        type: Number,
+        default: 0,
+      },
+      messagesCount: {
+        type: Number,
+        default: 0,
+      },
+      practiceHours: {
+        type: Number,
+        default: 0,
+      },
+    },
+    interests: [{
+      type: String,
+    }],
+    achievements: [{
+      type: String,
+    }],
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
+// Hash password before saving
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
 
@@ -63,9 +130,13 @@ userSchema.pre("save", async function (next) {
   }
 });
 
-userSchema.methods.matchPassword = async function (enteredPassword) {
-  const isPasswordCorrect = await bcrypt.compare(enteredPassword, this.password);
-  return isPasswordCorrect;
+// Compare password method
+userSchema.methods.comparePassword = async function (candidatePassword) {
+  try {
+    return await bcrypt.compare(candidatePassword, this.password);
+  } catch (error) {
+    throw error;
+  }
 };
 
 const User = mongoose.model("User", userSchema);

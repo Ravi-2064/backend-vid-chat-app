@@ -9,6 +9,8 @@ const SignUpPage = () => {
     fullName: "",
     email: "",
     password: "",
+    nativeLanguage: "",
+    learningLanguage: "",
   });
 
   // This is how we did it at first, without using our custom hook
@@ -108,6 +110,56 @@ const SignUpPage = () => {
                     <p className="text-xs opacity-70 mt-1">
                       Password must be at least 6 characters long
                     </p>
+                  </div>
+
+                  {/* NATIVE LANGUAGE */}
+                  <div className="form-control w-full">
+                    <label className="label">
+                      <span className="label-text">Native Language</span>
+                    </label>
+                    <select
+                      className="select select-bordered w-full"
+                      value={signupData.nativeLanguage}
+                      onChange={(e) => setSignupData({ ...signupData, nativeLanguage: e.target.value })}
+                      required
+                    >
+                      <option value="">Select your native language</option>
+                      <option value="english">English</option>
+                      <option value="spanish">Spanish</option>
+                      <option value="french">French</option>
+                      <option value="german">German</option>
+                      <option value="italian">Italian</option>
+                      <option value="portuguese">Portuguese</option>
+                      <option value="russian">Russian</option>
+                      <option value="japanese">Japanese</option>
+                      <option value="chinese">Chinese</option>
+                      <option value="korean">Korean</option>
+                    </select>
+                  </div>
+
+                  {/* LEARNING LANGUAGE */}
+                  <div className="form-control w-full">
+                    <label className="label">
+                      <span className="label-text">Language You Want to Learn</span>
+                    </label>
+                    <select
+                      className="select select-bordered w-full"
+                      value={signupData.learningLanguage}
+                      onChange={(e) => setSignupData({ ...signupData, learningLanguage: e.target.value })}
+                      required
+                    >
+                      <option value="">Select language to learn</option>
+                      <option value="english">English</option>
+                      <option value="spanish">Spanish</option>
+                      <option value="french">French</option>
+                      <option value="german">German</option>
+                      <option value="italian">Italian</option>
+                      <option value="portuguese">Portuguese</option>
+                      <option value="russian">Russian</option>
+                      <option value="japanese">Japanese</option>
+                      <option value="chinese">Chinese</option>
+                      <option value="korean">Korean</option>
+                    </select>
                   </div>
 
                   <div className="form-control">

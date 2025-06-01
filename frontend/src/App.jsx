@@ -1,140 +1,124 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import LandingPage from './pages/LandingPage';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { GoogleOAuthProvider } from '@react-oauth/google';
+import { AuthProvider } from './contexts/AuthContext';
+import { SocketProvider } from './contexts/SocketContext';
+import Navbar from './components/Navbar';
+import PrivateRoute from './components/PrivateRoute';
+import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ChatRoom from './pages/ChatRoom';
 import VideoChatRoom from './pages/VideoChatRoom';
-import Layout from './components/Layout';
-import HomePage from './pages/HomePage';
 import FriendsPage from './pages/FriendsPage';
-import NotificationsPage from './pages/NotificationsPage';
-import { useAuth } from './hooks/useAuth';
-import './styles/typography.css';
-import './styles/colors.css';
-import './App.css';
+import UserSettings from './pages/UserSettings';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: false,
-      refetchOnWindowFocus: false,
-    },
-  },
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      retry: 1,
+      refetchOnWindowFocus: false
+    }
+  }
 });
 
-// Protected Route Component
-const ProtectedRoute = ({ children }) => {
-  const { authUser, isLoading } = useAuth();
-  
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="loading loading-spinner loading-lg"></div>
-      </div>
-    );
-  }
-  
-  if (!authUser) {
-    return <Navigate to="/landing" replace />;
-  }
-  
-  return children;
-};
-
-// Public Route Component
-const PublicRoute = ({ children }) => {
-  const { authUser, isLoading } = useAuth();
-  
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="loading loading-spinner loading-lg"></div>
-      </div>
-    );
-  }
-  
-  if (authUser) {
-    return <Navigate to="/" replace />;
-  }
-  
-  return children;
-};
-
-// Loading component
-const Loading = () => (
-  <div className="min-h-screen flex items-center justify-center bg-gradient-primary">
-    <div className="text-white text-2xl font-semibold animate-pulse">Loading...</div>
-  </div>
-);
-
-// Error boundary component
-const ErrorFallback = ({ error }) => (
-  <div className="min-h-screen flex items-center justify-center bg-gradient-primary">
-    <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full animate-fadeIn">
-      <h2 className="text-2xl font-bold text-error mb-4">Something went wrong</h2>
-      <p className="text-neutral-700">{error.message}</p>
-    </div>
-  </div>
-);
+const GOOGLE_CLIENT_ID = '334465248552-i68au3j1u1tapcs9qt8sqfmfrpqo7ppi.apps.googleusercontent.com';
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Router>
-        <Toaster position="top-center" />
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/landing" element={
-            <PublicRoute>
-              <LandingPage />
-            </PublicRoute>
-          } />
-          <Route path="/login" element={
-            <PublicRoute>
-              <LoginPage />
-            </PublicRoute>
-          } />
-          <Route path="/register" element={
-            <PublicRoute>
-              <RegisterPage />
-            </PublicRoute>
-          } />
-          
-          {/* Protected Routes */}
-          <Route path="/" element={
-            <ProtectedRoute>
-              <Layout>
-                <HomePage />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/chat" element={
-            <ProtectedRoute>
-              <Layout>
-                <VideoChatRoom />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/friends" element={
-            <ProtectedRoute>
-              <Layout>
-                <FriendsPage />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/notifications" element={
-            <ProtectedRoute>
-              <Layout>
-                <NotificationsPage />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          
-          {/* Fallback Route */}
-          <Route path="*" element={<Navigate to="/landing" replace />} />
-        </Routes>
-      </Router>
+      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+        <AuthProvider>
+          <SocketProvider>
+            <Router>
+              <div className="min-h-screen bg-gray-50">
+                <Navbar />
+                <Toaster 
+                  position="top-right"
+                  toastOptions={{
+                    duration: 3000,
+                    style: {
+                      background: '#333',
+                      color: '#fff',
+                    },
+                  }}
+                />
+                <Routes>
+                  <Route
+                    path="/"
+                    element={
+                      <PrivateRoute>
+                        <ErrorBoundary>
+                          <HomePage />
+                        </ErrorBoundary>
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/login"
+                    element={
+                      <ErrorBoundary>
+                        <LoginPage />
+                      </ErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/register"
+                    element={
+                      <ErrorBoundary>
+                        <RegisterPage />
+                      </ErrorBoundary>
+                    }
+                  />
+                  <Route
+                    path="/chat/:roomId?"
+                    element={
+                      <PrivateRoute>
+                        <ErrorBoundary>
+                          <ChatRoom />
+                        </ErrorBoundary>
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/video-chat/:roomId?"
+                    element={
+                      <PrivateRoute>
+                        <ErrorBoundary>
+                          <VideoChatRoom />
+                        </ErrorBoundary>
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/friends"
+                    element={
+                      <PrivateRoute>
+                        <ErrorBoundary>
+                          <FriendsPage />
+                        </ErrorBoundary>
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/settings"
+                    element={
+                      <PrivateRoute>
+                        <ErrorBoundary>
+                          <UserSettings />
+                        </ErrorBoundary>
+                      </PrivateRoute>
+                    }
+                  />
+                </Routes>
+              </div>
+            </Router>
+          </SocketProvider>
+        </AuthProvider>
+      </GoogleOAuthProvider>
     </QueryClientProvider>
   );
 }

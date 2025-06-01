@@ -1,140 +1,451 @@
-import { axiosInstance } from "./axios";
 import axios from "axios";
 
-// Mock data
-const mockUser = {
-  id: '1',
-  name: 'Demo User',
-  email: 'demo@example.com',
-  profilePic: 'https://avatar.iran.liara.run/public/1.png',
-  nativeLanguage: 'english',
-  learningLanguage: 'spanish',
-  location: 'New York, USA',
-  bio: 'Just a demo user exploring the app!',
+const API_URL = "http://localhost:5000/api";
+
+// Create axios instance with default config
+const api = axios.create({
+  baseURL: API_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+  withCredentials: true // Enable sending cookies
+});
+
+// Add auth token to requests
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Add response interceptor for error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Handle unauthorized access
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.href = "/login";
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Helper function to handle API requests
+const handleResponse = async (response) => {
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Something went wrong');
+  }
+  return data;
 };
 
-const mockFriends = [
-  {
-    _id: '2',
-    fullName: 'John Doe',
-    email: 'john@example.com',
-    profilePic: 'https://avatar.iran.liara.run/public/2.png',
-    nativeLanguage: 'spanish',
-    learningLanguage: 'english',
-    location: 'Madrid, Spain',
-    bio: 'Hola!',
-  },
-  {
-    _id: '3',
-    fullName: 'Jane Smith',
-    email: 'jane@example.com',
-    profilePic: 'https://avatar.iran.liara.run/public/3.png',
-    nativeLanguage: 'french',
-    learningLanguage: 'english',
-    location: 'Paris, France',
-    bio: 'Bonjour!',
-  },
-];
+// Authentication API calls
+export const login = async ({ email, password }) => {
+  try {
+    const response = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ email, password }),
+    });
 
-const mockRecommendedUsers = [
-  {
-    _id: '4',
-    fullName: 'Mike Johnson',
-    email: 'mike@example.com',
-    profilePic: 'https://avatar.iran.liara.run/public/4.png',
-    nativeLanguage: 'german',
-    learningLanguage: 'english',
-    location: 'Berlin, Germany',
-    bio: 'Hallo!',
-  },
-  {
-    _id: '5',
-    fullName: 'Sarah Wilson',
-    email: 'sarah@example.com',
-    profilePic: 'https://avatar.iran.liara.run/public/5.png',
-    nativeLanguage: 'italian',
-    learningLanguage: 'english',
-    location: 'Rome, Italy',
-    bio: 'Ciao!',
-  },
-];
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Login failed');
+    }
+    
+    if (!data.success) {
+      throw new Error(data.message || 'Login failed');
+    }
 
-// Simulate API delay
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Actual API calls
-export const signup = async (signupData) => {
-  const response = await axios.post('/api/auth/signup', signupData);
-  return response.data;
+    // Store auth data in localStorage
+    if (data.token && data.user) {
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      return data;
+    } else {
+      throw new Error('Invalid response from server');
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    throw error;
+  }
 };
 
-export const login = async (loginData) => {
-  const response = await axios.post('/api/auth/login', loginData);
-  return response.data;
+export const register = async (userData) => {
+  const response = await fetch(`${API_URL}/auth/signup`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(userData),
+  });
+  return handleResponse(response);
 };
 
 export const logout = async () => {
-  await delay(500);
-  return { success: true };
+  const token = localStorage.getItem('token');
+  const response = await fetch(`${API_URL}/auth/logout`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  return handleResponse(response);
 };
 
+// User Profile API calls
 export const getAuthUser = async () => {
-  await delay(500);
-  // Return mockUser if a mock token exists in local storage or similar
-  // For now, just return the user directly
-  return { user: mockUser };
+  try {
+    const response = await api.get("/users/profile");
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to fetch user profile");
+  }
 };
 
-export async function getUserFriends() {
-  await delay(500);
-  return mockFriends;
-}
+export const updateUserProfile = async (userData) => {
+  const token = localStorage.getItem('token');
+  const response = await fetch(`${API_URL}/users/profile`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(userData),
+  });
+  return handleResponse(response);
+};
 
-export async function getRecommendedUsers() {
-  await delay(500);
-  return mockRecommendedUsers;
-}
+// Blog API calls
+export const addBlog = async (blogData) => {
+  try {
+    const response = await api.post("/users/blogs", blogData);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to create blog");
+  }
+};
 
-export async function getOutgoingFriendReqs() {
-  await delay(500);
-  return [];
-}
+export const updateBlog = async (blogId, blogData) => {
+  try {
+    const response = await api.put(`/users/blogs/${blogId}`, blogData);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to update blog");
+  }
+};
 
-export async function sendFriendRequest(userId) {
-  await delay(500);
-  return { success: true };
-}
+export const deleteBlog = async (blogId) => {
+  try {
+    const response = await api.delete(`/users/blogs/${blogId}`);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to delete blog");
+  }
+};
 
-export async function getFriendRequests() {
-  await delay(500);
-  return {
-    incomingReqs: [
+export const addBlogComment = async (blogId, commentData) => {
+  try {
+    const response = await api.post(`/users/blogs/${blogId}/comments`, commentData);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to add comment");
+  }
+};
+
+export const likeBlog = async (blogId) => {
+  try {
+    const response = await api.post(`/users/blogs/${blogId}/like`);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to like blog");
+  }
+};
+
+// Activity Stats API calls
+export const updateActivityStats = async (statsData) => {
+  try {
+    const response = await api.put("/users/activity", statsData);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to update activity stats");
+  }
+};
+
+// Friends API calls
+export const getUserFriends = async () => {
+  try {
+    const response = await api.get("/users/friends");
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to fetch friends");
+  }
+};
+
+export const getFriendRequests = async () => {
+  try {
+    const response = await api.get("/users/friend-requests");
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to fetch friend requests");
+  }
+};
+
+export const sendFriendRequest = async (userId) => {
+  try {
+    const response = await api.post(`/users/friend-requests/${userId}`);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to send friend request");
+  }
+};
+
+export const acceptFriendRequest = async (requestId) => {
+  try {
+    const response = await api.put(`/users/friend-requests/${requestId}/accept`);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to accept friend request");
+  }
+};
+
+export const rejectFriendRequest = async (requestId) => {
+  try {
+    const response = await api.put(`/users/friend-requests/${requestId}/reject`);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to reject friend request");
+  }
+};
+
+export const getOutgoingFriendReqs = async () => {
+  try {
+    const response = await api.get("/users/friend-requests/outgoing");
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to fetch outgoing requests");
+  }
+};
+
+export const getRecommendedUsers = async () => {
+  try {
+    const response = await api.get("/users/recommended");
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to fetch recommended users");
+  }
+};
+
+// Mock data for development
+const mockUsers = [
+  {
+    _id: "user1",
+    email: "alex@streamify.com",
+    password: "password123",
+    fullName: "Alex Thompson",
+    profilePic: "https://i.pravatar.cc/150?img=1",
+    backgroundImage: "https://images.unsplash.com/photo-1506744038136-46273834b3fb",
+    location: "New York, USA",
+    bio: "Language enthusiast and avid traveler. Learning Spanish and French.",
+    nativeLanguage: "english",
+    learningLanguage: "spanish",
+    friends: ["user2"],
+    hobbies: ["Travel", "Music", "Cooking"],
+    blogs: [
       {
-        _id: '6',
-        sender: {
-          _id: '6',
-          fullName: 'Alex Brown',
-          email: 'alex@example.com',
-          profilePic: 'https://via.placeholder.com/150',
-          nativeLanguage: 'english',
-          learningLanguage: 'mandarin',
-          location: 'London, UK',
-          bio: 'Ni hao!',
-        },
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-      },
+        id: "1",
+        title: "My Language Learning Journey",
+        content: "Started learning Spanish 6 months ago...",
+        date: new Date().toISOString(),
+        likes: 5,
+        comments: []
+      }
     ],
-    acceptedReqs: [],
+    activityStats: {
+      friendsCount: 1,
+      messagesCount: 15,
+      practiceHours: 25
+    },
+    interests: ["Travel", "Music", "Cooking"],
+    achievements: ["10 Day Streak", "First Conversation"]
+  },
+  {
+    _id: "user2",
+    email: "maria@example.com",
+    password: "password123",
+    fullName: "Maria Garcia",
+    profilePic: "https://i.pravatar.cc/150?img=2",
+    backgroundImage: "https://images.unsplash.com/photo-1516483638261-f4dbaf036963",
+    location: "Madrid, Spain",
+    bio: "Spanish teacher and language exchange partner. Love helping others learn!",
+    nativeLanguage: "spanish",
+    learningLanguage: "english",
+    friends: ["user1"],
+    hobbies: ["Teaching", "Dancing", "Reading"],
+    blogs: [
+      {
+        id: "2",
+        title: "Tips for Learning Spanish",
+        content: "Here are my top tips for learning Spanish...",
+        date: new Date().toISOString(),
+        likes: 8,
+        comments: []
+      }
+    ],
+    activityStats: {
+      friendsCount: 1,
+      messagesCount: 15,
+      practiceHours: 30
+    },
+    interests: ["Teaching", "Dancing", "Reading"],
+    achievements: ["Top Contributor", "Language Mentor"]
+  }
+];
+
+// Mock API functions for development
+export const mockLogin = async (email, password) => {
+  // Simulate API delay
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
+  const user = mockUsers.find(u => u.email === email && u.password === password);
+  if (!user) {
+    throw new Error("Invalid email or password");
+  }
+
+  // Store user in localStorage
+  localStorage.setItem("user", JSON.stringify(user));
+  return { user, token: "mock-token" };
+};
+
+export const mockGetAuthUser = async () => {
+  const user = JSON.parse(localStorage.getItem("user"));
+  if (!user) {
+    throw new Error("Not authenticated");
+  }
+  return user;
+};
+
+export const mockUpdateUserProfile = async (profileData) => {
+  const user = JSON.parse(localStorage.getItem("user"));
+  if (!user) {
+    throw new Error("Not authenticated");
+  }
+
+  const updatedUser = { ...user, ...profileData };
+  localStorage.setItem("user", JSON.stringify(updatedUser));
+  return updatedUser;
+};
+
+export const mockAddBlog = async (blogData) => {
+  const user = JSON.parse(localStorage.getItem("user"));
+  if (!user) {
+    throw new Error("Not authenticated");
+  }
+
+  const newBlog = {
+    id: Date.now().toString(),
+    ...blogData,
+    date: new Date().toISOString(),
+    likes: 0,
+    comments: []
   };
-}
 
-export async function acceptFriendRequest(requestId) {
-  await delay(500);
-  return { success: true };
-}
+  user.blogs = [...(user.blogs || []), newBlog];
+  localStorage.setItem("user", JSON.stringify(user));
+  return newBlog;
+};
 
-export async function getStreamToken() {
-  await delay(500);
-  return { token: 'mock-stream-token' };
-}
+export const mockUpdateActivityStats = async (statsData) => {
+  const user = JSON.parse(localStorage.getItem("user"));
+  if (!user) {
+    throw new Error("Not authenticated");
+  }
+
+  user.activityStats = { ...user.activityStats, ...statsData };
+  localStorage.setItem("user", JSON.stringify(user));
+  return user.activityStats;
+};
+
+// Chat API calls
+export const getMessages = async (roomId) => {
+  const token = localStorage.getItem('token');
+  const response = await fetch(`${API_URL}/chat/messages/${roomId}`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+  return handleResponse(response);
+};
+
+export const sendMessage = async (roomId, message) => {
+  const token = localStorage.getItem('token');
+  const response = await fetch(`${API_URL}/chat/messages`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ roomId, message }),
+  });
+  return handleResponse(response);
+};
+
+export const uploadFile = async (roomId, file) => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post(`/chat/rooms/${roomId}/files`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to upload file");
+  }
+};
+
+// Chat Room API calls
+export const getRoomParticipants = async (roomId) => {
+  try {
+    const response = await api.get(`/chat/rooms/${roomId}/participants`);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to fetch room participants");
+  }
+};
+
+export const joinRoom = async (roomId) => {
+  try {
+    const response = await api.post(`/chat/rooms/${roomId}/join`);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to join room");
+  }
+};
+
+export const leaveRoom = async (roomId) => {
+  try {
+    const response = await api.post(`/chat/rooms/${roomId}/leave`);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to leave room");
+  }
+};
+
+export const removeParticipant = async (roomId, participantId) => {
+  try {
+    const response = await api.delete(`/chat/rooms/${roomId}/participants/${participantId}`);
+    return response.data;
+  } catch (error) {
+    throw new Error(error.response?.data?.message || "Failed to remove participant");
+  }
+};
