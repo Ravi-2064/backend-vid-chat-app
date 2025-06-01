@@ -3,7 +3,7 @@ services:
     name: vid-chat-backend
     env: node
     buildCommand: npm install
-    startCommand: node ./src/server.js
+    startCommand: node /opt/render/project/src/server.js
     envVars:
       - key: NODE_ENV
         value: production
