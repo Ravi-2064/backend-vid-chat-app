@@ -1,0 +1,12 @@
+# Exported from Render on 2025-06-04T05:34:48Z
+services:
+- type: web
+  name: backend-vid-chat-app
+  runtime: node
+  repo: https://github.com/Ravi-2064/backend-vid-chat-app
+  plan: free
+  region: oregon
+  buildCommand: npm install
+  startCommand: node index.js
+  autoDeployTrigger: commit
+version: "1"
